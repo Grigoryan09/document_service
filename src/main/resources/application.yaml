@@ -1,3 +1,9 @@
 spring:
   application:
     name: document_service
+
+template:
+  path:
+    generated:
+      contract: classpath:/templates/contract.docx
+    contract: classpath:/templates/contract.docx
