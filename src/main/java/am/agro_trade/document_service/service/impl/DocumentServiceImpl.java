@@ -4,6 +4,7 @@ import am.agro_trade.document_service.dto.PaymentRowDto;
 import am.agro_trade.document_service.dto.document.DocumentGenerateDto;
 import am.agro_trade.document_service.service.DocumentService;
 import jakarta.xml.bind.JAXBException;
+import lombok.RequiredArgsConstructor;
 import org.docx4j.TraversalUtil;
 import org.docx4j.finders.ClassFinder;
 import org.docx4j.openpackaging.exceptions.Docx4JException;
@@ -11,93 +12,132 @@ import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
 import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
 import org.docx4j.wml.*;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
+
+    private final ResourceLoader resourceLoader;
+
     @Value("${template.path.contract}")
     String TEMP_DIR;
 
     @Override
-    public byte[] getDocumentContract(DocumentGenerateDto documentGenerateDto) {
-        try {
-            WordprocessingMLPackage word = WordprocessingMLPackage.load(new File(TEMP_DIR));
+    public String generateContractDocument(DocumentGenerateDto dto) {
+        String clientName = dto.clientInfoDto() != null
+                ? dto.clientInfoDto().fullName()
+                : "unknown";
+
+        try (InputStream is = loadTemplate()) {
+
+            WordprocessingMLPackage word = WordprocessingMLPackage.load(is);
             MainDocumentPart mainPart = word.getMainDocumentPart();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
+            replaceVariables(mainPart, dto);
+            fillPaymentTable(mainPart, dto.paymentRowDtoList());
 
-            Map<String, String> variables = new HashMap<>();
+            return Base64.getEncoder().encodeToString(toByteArray(word));
 
-            variables.put("bankName",documentGenerateDto.bankDto().bankName());
-            variables.put("bankPhoneNumber",documentGenerateDto.bankDto().phoneNumber());
-            variables.put("offerType",documentGenerateDto.offerDto().offerType());
-            variables.put("interestRate",documentGenerateDto.offerDto().interestRate().toString());
-            variables.put("approvedAmount",documentGenerateDto.finalContractDto().approvedAmount().toString());
-            variables.put("approvedPeriod",String.valueOf(documentGenerateDto.finalContractDto().approvedPeriod()));
-            variables.put("clientFullName",documentGenerateDto.clientInfoDto().fullName());
-            variables.put("email",documentGenerateDto.clientInfoDto().email());
-            variables.put("phoneNumber",documentGenerateDto.clientInfoDto().phoneNumber());
-            variables.put("passportNumber",documentGenerateDto.clientInfoDto().passportInfo().passportNumber());
-            variables.put("date",documentGenerateDto.finalContractDto().createdAt().format(formatter));
-
-            word.getMainDocumentPart().variableReplace(variables);
-
-            // Находим первую таблицу в документе
-            ClassFinder finder = new ClassFinder(Tbl.class);
-            new TraversalUtil(mainPart.getContent(), finder);
-            Tbl table = (Tbl) finder.results.get(0);
-
-            ObjectFactory factory = new ObjectFactory();
-
-            // Пропускаем первую строку (заголовок)
-            List<Object> tableRows = table.getContent();
-
-            // Начинаем с первой строки (после заголовка)
-            for (PaymentRowDto row : documentGenerateDto.paymentRowDtoList()) {
-                Tr tr = factory.createTr();
-                tr.getContent().add(createCell(String.valueOf(row.month())));
-                tr.getContent().add(createCell(row.monthlyPayment().toString()));
-                tr.getContent().add(createCell(row.interest().toString()));
-                tr.getContent().add(createCell(row.principal().toString()));
-                tr.getContent().add(createCell(row.balance().toString()));
-                table.getContent().add(tr);
-            }
-
-            String dateTime = documentGenerateDto.finalContractDto().createdAt().format(formatter);
-            String fileName = "contract_" + documentGenerateDto.bankDto().bankName() + "_" + documentGenerateDto.clientInfoDto().fullName() + "_" + dateTime + ".docx";
-
-            File output = new File("generated/" + fileName);
-            word.save(output);
-
-
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load DOCX template", e);
         } catch (Docx4JException | JAXBException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to process DOCX document" + clientName, e);
         }
-        return null;
     }
 
-    private Tc createCell(String value) {
+    private InputStream loadTemplate() throws IOException {
+        Resource resource = resourceLoader.getResource(TEMP_DIR);
+        return resource.getInputStream();
+    }
 
+    private void replaceVariables(MainDocumentPart mainPart, DocumentGenerateDto dto) throws JAXBException, Docx4JException {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        Map<String, String> variables = new HashMap<>();
+
+        variables.put("bankName", safe(dto.bankDto().bankName()));
+        variables.put("bankPhoneNumber", safe(dto.bankDto().phoneNumber()));
+        variables.put("offerType", safe(dto.offerDto().offerType()));
+        variables.put("interestRate", decimalFormat(dto.offerDto().interestRate()));
+        variables.put("approvedAmount", decimalFormat(dto.finalContractDto().approvedAmount()));
+        variables.put("approvedPeriod", String.valueOf(dto.finalContractDto().approvedPeriod()));
+        variables.put("clientFullName", safe(dto.clientInfoDto().fullName()));
+        variables.put("email", safe(dto.clientInfoDto().email()));
+        variables.put("phoneNumber", safe(dto.clientInfoDto().phoneNumber()));
+        if (dto.clientInfoDto().passportInfo() != null) {
+            variables.put("passportNumber",
+                    safe(dto.clientInfoDto().passportInfo().passportNumber()));
+        }
+        variables.put("date", dto.finalContractDto().createdAt().format(formatter));
+        mainPart.variableReplace(variables);
+    }
+
+    private void fillPaymentTable(MainDocumentPart mainPart, List<PaymentRowDto> rows) {
+        ClassFinder finder = new ClassFinder(Tbl.class);
+        new TraversalUtil(mainPart.getContent(), finder);
+
+        if (finder.results.isEmpty()) {
+            throw new RuntimeException("Table not found in template");
+        }
+
+        Tbl table = (Tbl) finder.results.get(0);
         ObjectFactory factory = new ObjectFactory();
 
-        Tc cell = factory.createTc();
-        P paragraph = factory.createP();
-        R run = factory.createR();
-        Text text = factory.createText();
+        for (PaymentRowDto row : rows) {
+            Tr tr = factory.createTr();
+            tr.getContent().add(createCell(String.valueOf(row.month())));
+            tr.getContent().add(createCell(decimalFormat(row.monthlyPayment())));
+            tr.getContent().add(createCell(decimalFormat(row.interest())));
+            tr.getContent().add(createCell(decimalFormat(row.principal())));
+            tr.getContent().add(createCell(decimalFormat(row.balance())));
 
-        text.setValue(value);
-        text.setSpace("preserve"); // важно!
+            table.getContent().add(tr);
+        }
+    }
 
-        run.getContent().add(text);
-        paragraph.getContent().add(run);
-        cell.getContent().add(paragraph);
+    private String safe(String value) {
+        return value == null ? "" : value;
+    }
 
-        return cell;
+    private String decimalFormat(BigDecimal value) {
+        if (value == null) return "";
+        return new DecimalFormat("#.##").format(value);
+    }
+
+    private byte[] toByteArray(WordprocessingMLPackage word) throws Docx4JException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        word.save(baos);
+        return baos.toByteArray();
+    }
+
+    private Tc createCell(String text) {
+        ObjectFactory factory = new ObjectFactory();
+
+        Tc tc = factory.createTc();
+        P p = factory.createP();
+        R r = factory.createR();
+        Text t = factory.createText();
+
+        t.setValue(text);
+        r.getContent().add(t);
+        p.getContent().add(r);
+        tc.getContent().add(p);
+
+        return tc;
     }
 }
+

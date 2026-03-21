@@ -4,5 +4,6 @@ import am.agro_trade.document_service.dto.document.DocumentGenerateDto;
 
 public interface DocumentService {
 
-    byte[] getDocumentContract(DocumentGenerateDto documentGenerateDto);
+    String generateContractDocument(DocumentGenerateDto documentGenerateDto);
+
 }
