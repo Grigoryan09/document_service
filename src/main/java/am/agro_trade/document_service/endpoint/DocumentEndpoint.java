@@ -18,7 +18,6 @@ public class DocumentEndpoint {
 
     @PostMapping("/generation")
     public GeneratedDocumentResponse generateDocument(@RequestBody DocumentGenerateDto documentGenerateDto) {
-        String encodeDocument = documentService.generateContractDocument(documentGenerateDto);
-        return new GeneratedDocumentResponse(encodeDocument,"docx", LocalDateTime.now());
+        return new GeneratedDocumentResponse(documentService.generateContractDocument(documentGenerateDto),"docx", LocalDateTime.now());
     }
 }
