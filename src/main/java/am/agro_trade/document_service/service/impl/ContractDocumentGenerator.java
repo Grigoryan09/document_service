@@ -1,8 +1,12 @@
 package am.agro_trade.document_service.service.impl;
 
+import am.agro_trade.document_service.dto.ClientInfoDto;
 import am.agro_trade.document_service.dto.PaymentRowDto;
 import am.agro_trade.document_service.dto.document.DocumentGenerateDto;
-import am.agro_trade.document_service.service.DocumentService;
+import am.agro_trade.document_service.enums.DocumentType;
+import am.agro_trade.document_service.service.DocumentGenerator;
+import am.agro_trade.document_service.utils.TemplateKeys;
+import am.agro_trade.document_service.utils.TemplateProperties;
 import jakarta.xml.bind.JAXBException;
 import lombok.RequiredArgsConstructor;
 import org.docx4j.TraversalUtil;
@@ -11,7 +15,6 @@ import org.docx4j.openpackaging.exceptions.Docx4JException;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
 import org.docx4j.openpackaging.parts.WordprocessingML.MainDocumentPart;
 import org.docx4j.wml.*;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
@@ -22,25 +25,26 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
-public class DocumentServiceImpl implements DocumentService {
+public class ContractDocumentGenerator implements DocumentGenerator {
 
     private final ResourceLoader resourceLoader;
-
-    @Value("${template.path.contract}")
-    String TEMP_DIR;
+    private final TemplateProperties templateProperties;
 
     @Override
-    public String generateContractDocument(DocumentGenerateDto dto) {
-        String clientName = dto.clientInfoDto() != null
-                ? dto.clientInfoDto().fullName()
-                : "unknown";
+    public DocumentType getType() {
+        return DocumentType.CONTRACT;
+    }
+
+    @Override
+    public String generate(DocumentGenerateDto dto) {
+        String clientName = Optional.ofNullable(dto.clientInfoDto())
+                .map(ClientInfoDto::fullName)
+                .map(this::safe)
+                .orElse("unknown");
 
         try (InputStream is = loadTemplate()) {
 
@@ -60,29 +64,38 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     private InputStream loadTemplate() throws IOException {
-        Resource resource = resourceLoader.getResource(TEMP_DIR);
+        Resource resource = resourceLoader.getResource(templateProperties.getContract());
         return resource.getInputStream();
     }
 
     private void replaceVariables(MainDocumentPart mainPart, DocumentGenerateDto dto) throws JAXBException, Docx4JException {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        var bank = dto.bankDto();
+        var offer = dto.offerDto();
+        var contract = dto.finalContractDto();
+        var client = dto.clientInfoDto();
+        var passport = client != null ? client.passportInfo() : null;
 
         Map<String, String> variables = new HashMap<>();
 
-        variables.put("bankName", safe(dto.bankDto().bankName()));
-        variables.put("bankPhoneNumber", safe(dto.bankDto().phoneNumber()));
-        variables.put("offerType", safe(dto.offerDto().offerType()));
-        variables.put("interestRate", decimalFormat(dto.offerDto().interestRate()));
-        variables.put("approvedAmount", decimalFormat(dto.finalContractDto().approvedAmount()));
-        variables.put("approvedPeriod", String.valueOf(dto.finalContractDto().approvedPeriod()));
-        variables.put("clientFullName", safe(dto.clientInfoDto().fullName()));
-        variables.put("email", safe(dto.clientInfoDto().email()));
-        variables.put("phoneNumber", safe(dto.clientInfoDto().phoneNumber()));
-        if (dto.clientInfoDto().passportInfo() != null) {
-            variables.put("passportNumber",
-                    safe(dto.clientInfoDto().passportInfo().passportNumber()));
+        variables.put(TemplateKeys.BANK_NAME, safe(bank.bankName()));
+        variables.put(TemplateKeys.BANK_PHONE_NUMBER, safe(bank.phoneNumber()));
+        variables.put(TemplateKeys.OFFER_TYPE, safe(offer.offerType()));
+        variables.put(TemplateKeys.INTEREST_RATE, decimalFormat(offer.interestRate()));
+        variables.put(TemplateKeys.APPROVED_AMOUNT, decimalFormat(contract.approvedAmount()));
+        variables.put(TemplateKeys.APPROVED_PERIOD, String.valueOf(contract.approvedPeriod()));
+        variables.put(TemplateKeys.DATE, contract.createdAt().format(formatter));
+
+        if (client != null) {
+            variables.put(TemplateKeys.CLIENT_FULL_NAME, safe(client.fullName()));
+            variables.put(TemplateKeys.EMAIL, safe(client.email()));
+            variables.put(TemplateKeys.PHONE_NUMBER, safe(client.phoneNumber()));
+
+            if (passport != null) {
+                variables.put(TemplateKeys.PASSPORT_NUMBER, safe(passport.passportNumber()));
+            }
         }
-        variables.put("date", dto.finalContractDto().createdAt().format(formatter));
+
         mainPart.variableReplace(variables);
     }
 
@@ -90,11 +103,7 @@ public class DocumentServiceImpl implements DocumentService {
         ClassFinder finder = new ClassFinder(Tbl.class);
         new TraversalUtil(mainPart.getContent(), finder);
 
-        if (finder.results.isEmpty()) {
-            throw new RuntimeException("Table not found in template");
-        }
-
-        Tbl table = (Tbl) finder.results.get(0);
+        Tbl table = (Tbl) finder.results.getFirst();
         ObjectFactory factory = new ObjectFactory();
 
         for (PaymentRowDto row : rows) {
