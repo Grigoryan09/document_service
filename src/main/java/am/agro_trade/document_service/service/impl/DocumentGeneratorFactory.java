@@ -1,6 +1,7 @@
 package am.agro_trade.document_service.service.impl;
 
 import am.agro_trade.document_service.enums.DocumentType;
+import am.agro_trade.document_service.exception.DocumentGeneratorNotFoundException;
 import am.agro_trade.document_service.service.DocumentGenerator;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +24,7 @@ public class DocumentGeneratorFactory {
         DocumentGenerator generator = generators.get(type);
 
         if (generator == null) {
-            throw new RuntimeException("No generator found for type: " + type);
+            throw new DocumentGeneratorNotFoundException(type);
         }
 
         return generator;

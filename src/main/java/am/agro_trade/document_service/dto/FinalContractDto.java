@@ -16,6 +16,8 @@ public record FinalContractDto(
         @NotNull(message = "Approved period must be provided")
         int approvedPeriod,
 
+        @Valid
+        @NotNull
         ProductDto productDto,
 
         LocalDateTime createdAt

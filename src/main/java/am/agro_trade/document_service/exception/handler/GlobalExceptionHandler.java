@@ -1,6 +1,7 @@
 package am.agro_trade.document_service.exception.handler;
 
 import am.agro_trade.document_service.dto.document.ErrorResponse;
+import am.agro_trade.document_service.exception.DocumentGeneratorNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,5 +35,18 @@ public class GlobalExceptionHandler {
         response.setDetails(details);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(DocumentGeneratorNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleDocumentGeneratorNotFound(
+            DocumentGeneratorNotFoundException ex) {
+
+        ErrorResponse error = new ErrorResponse();
+        error.setTimestamp(Instant.now());
+        error.setStatus(HttpStatus.NOT_FOUND.value());
+        error.setError("Document Generator Not Found");
+        error.setMessage(ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
 }
