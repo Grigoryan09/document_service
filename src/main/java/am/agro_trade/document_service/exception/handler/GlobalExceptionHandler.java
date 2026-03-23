@@ -1,7 +1,10 @@
 package am.agro_trade.document_service.exception.handler;
 
 import am.agro_trade.document_service.dto.document.ErrorResponse;
+import am.agro_trade.document_service.dto.document.ValidationErrorResponse;
 import am.agro_trade.document_service.exception.DocumentGeneratorNotFoundException;
+import am.agro_trade.document_service.exception.DocumentProcessingException;
+import am.agro_trade.document_service.exception.TemplateLoadException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,17 +19,17 @@ import java.util.List;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleDocumentGeneration(
+    public ResponseEntity<ValidationErrorResponse> handleDocumentGeneration(
             MethodArgumentNotValidException ex,
             HttpServletRequest request
     ) {
-        List<ErrorResponse.FieldError> details = ex.getBindingResult()
+        List<ValidationErrorResponse.FieldError> details = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(fieldError -> new ErrorResponse.FieldError(fieldError.getField(), fieldError.getDefaultMessage()))
+                .map(fieldError -> new ValidationErrorResponse.FieldError(fieldError.getField(), fieldError.getDefaultMessage()))
                 .toList();
 
-        ErrorResponse response = new ErrorResponse();
+        ValidationErrorResponse response = new ValidationErrorResponse();
         response.setTimestamp(Instant.now());
         response.setStatus(HttpStatus.BAD_REQUEST.value());
         response.setError("Document Generation Failed");
@@ -40,13 +43,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DocumentGeneratorNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleDocumentGeneratorNotFound(
             DocumentGeneratorNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse(Instant.now(),"Document Generator Not Found",ex.getMessage()));
+    }
 
-        ErrorResponse error = new ErrorResponse();
-        error.setTimestamp(Instant.now());
-        error.setStatus(HttpStatus.NOT_FOUND.value());
-        error.setError("Document Generator Not Found");
-        error.setMessage(ex.getMessage());
+    @ExceptionHandler(TemplateLoadException.class)
+    public ResponseEntity<ErrorResponse> handleTemplateLoad(TemplateLoadException ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse(Instant.now(),"Template load error",ex.getMessage()));
+    }
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    @ExceptionHandler(DocumentProcessingException.class)
+    public ResponseEntity<ErrorResponse> handleDocumentProcessing(DocumentProcessingException ex) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorResponse(Instant.now(),"Template load error",ex.getMessage()));
     }
 }

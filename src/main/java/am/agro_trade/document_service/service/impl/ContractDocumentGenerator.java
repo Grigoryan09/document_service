@@ -4,6 +4,8 @@ import am.agro_trade.document_service.dto.ClientInfoDto;
 import am.agro_trade.document_service.dto.PaymentRowDto;
 import am.agro_trade.document_service.dto.document.DocumentGenerateDto;
 import am.agro_trade.document_service.enums.DocumentType;
+import am.agro_trade.document_service.exception.DocumentProcessingException;
+import am.agro_trade.document_service.exception.TemplateLoadException;
 import am.agro_trade.document_service.service.DocumentGenerator;
 import am.agro_trade.document_service.utils.TemplateKeys;
 import am.agro_trade.document_service.utils.TemplateProperties;
@@ -57,9 +59,10 @@ public class ContractDocumentGenerator implements DocumentGenerator {
             return Base64.getEncoder().encodeToString(toByteArray(word));
 
         } catch (IOException e) {
-            throw new RuntimeException("Failed to load DOCX template", e);
+            throw new TemplateLoadException("Failed to load DOCX template", e);
         } catch (Docx4JException | JAXBException e) {
-            throw new RuntimeException("Failed to process DOCX document" + clientName, e);
+            throw new DocumentProcessingException(
+                    "Failed to process DOCX document for client: " + clientName, e);
         }
     }
 
