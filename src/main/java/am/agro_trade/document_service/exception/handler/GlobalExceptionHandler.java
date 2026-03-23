@@ -44,18 +44,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDocumentGeneratorNotFound(
             DocumentGeneratorNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse(Instant.now(),"Document Generator Not Found",ex.getMessage()));
+                .body(new ErrorResponse(Instant.now(), "Document Generator Not Found", ex.getMessage()));
     }
 
     @ExceptionHandler(TemplateLoadException.class)
     public ResponseEntity<ErrorResponse> handleTemplateLoad(TemplateLoadException ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse(Instant.now(),"Template load error",ex.getMessage()));
+                .body(new ErrorResponse(Instant.now(), "Template load error", ex.getMessage()));
     }
 
     @ExceptionHandler(DocumentProcessingException.class)
     public ResponseEntity<ErrorResponse> handleDocumentProcessing(DocumentProcessingException ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse(Instant.now(),"Template load error",ex.getMessage()));
+                .body(new ErrorResponse(Instant.now(), "Template load error", ex.getMessage()));
     }
 }

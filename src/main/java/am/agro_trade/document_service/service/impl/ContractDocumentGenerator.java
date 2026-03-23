@@ -1,6 +1,5 @@
 package am.agro_trade.document_service.service.impl;
 
-import am.agro_trade.document_service.dto.ClientInfoDto;
 import am.agro_trade.document_service.dto.PaymentRowDto;
 import am.agro_trade.document_service.dto.document.DocumentGenerateDto;
 import am.agro_trade.document_service.enums.DocumentType;
@@ -27,7 +26,10 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -43,35 +45,35 @@ public class ContractDocumentGenerator implements DocumentGenerator {
 
     @Override
     public String generate(DocumentGenerateDto dto) {
-        String clientName = Optional.ofNullable(dto.clientInfoDto())
-                .map(ClientInfoDto::fullName)
-                .map(this::safe)
-                .orElse("unknown");
 
-        try (InputStream is = loadTemplate()) {
+        InputStream is = loadTemplate();
 
-            WordprocessingMLPackage word = WordprocessingMLPackage.load(is);
-            MainDocumentPart mainPart = word.getMainDocumentPart();
+        WordprocessingMLPackage word;
+        try {
+            word = WordprocessingMLPackage.load(is);
+        } catch (Docx4JException e) {
+            throw new DocumentProcessingException(
+                    "Failed to process DOCX document for client: " + TemplateKeys.CLIENT_FULL_NAME, e);
+        }
+        MainDocumentPart mainPart = word.getMainDocumentPart();
 
-            replaceVariables(mainPart, dto);
-            fillPaymentTable(mainPart, dto.paymentRowDtoList());
+        replaceVariables(mainPart, dto);
+        fillPaymentTable(mainPart, dto.paymentRowDtoList());
 
-            return Base64.getEncoder().encodeToString(toByteArray(word));
+        return Base64.getEncoder().encodeToString(toByteArray(word));
 
+    }
+
+    private InputStream loadTemplate() {
+        Resource resource = resourceLoader.getResource(templateProperties.getContract());
+        try {
+            return resource.getInputStream();
         } catch (IOException e) {
             throw new TemplateLoadException("Failed to load DOCX template", e);
-        } catch (Docx4JException | JAXBException e) {
-            throw new DocumentProcessingException(
-                    "Failed to process DOCX document for client: " + clientName, e);
         }
     }
 
-    private InputStream loadTemplate() throws IOException {
-        Resource resource = resourceLoader.getResource(templateProperties.getContract());
-        return resource.getInputStream();
-    }
-
-    private void replaceVariables(MainDocumentPart mainPart, DocumentGenerateDto dto) throws JAXBException, Docx4JException {
+    private void replaceVariables(MainDocumentPart mainPart, DocumentGenerateDto dto) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         var bank = dto.bankDto();
         var offer = dto.offerDto();
@@ -98,8 +100,12 @@ public class ContractDocumentGenerator implements DocumentGenerator {
                 variables.put(TemplateKeys.PASSPORT_NUMBER, safe(passport.passportNumber()));
             }
         }
-
-        mainPart.variableReplace(variables);
+        try {
+            mainPart.variableReplace(variables);
+        } catch (JAXBException | Docx4JException e) {
+            throw new DocumentProcessingException(
+                    "Failed to process DOCX document for client: " + TemplateKeys.CLIENT_FULL_NAME, e);
+        }
     }
 
     private void fillPaymentTable(MainDocumentPart mainPart, List<PaymentRowDto> rows) {
@@ -130,9 +136,14 @@ public class ContractDocumentGenerator implements DocumentGenerator {
         return new DecimalFormat("#.##").format(value);
     }
 
-    private byte[] toByteArray(WordprocessingMLPackage word) throws Docx4JException {
+    private byte[] toByteArray(WordprocessingMLPackage word) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        word.save(baos);
+        try {
+            word.save(baos);
+        } catch (Docx4JException e) {
+            throw new DocumentProcessingException(
+                    "Failed to process DOCX document for client: " + TemplateKeys.CLIENT_FULL_NAME, e);
+        }
         return baos.toByteArray();
     }
 

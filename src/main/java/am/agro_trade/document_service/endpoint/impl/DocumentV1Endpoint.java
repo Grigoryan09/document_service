@@ -23,6 +23,6 @@ public class DocumentV1Endpoint implements DocumentV1API {
     @Override
     @PostMapping("/generate-document")
     public GeneratedContractResponse generate(@RequestBody @Valid DocumentGenerateDto dto) {
-        return new GeneratedContractResponse(documentService.generate(dto, DocumentType.valueOf(dto.documentType())), DocumentFormat.DOCX.name(), LocalDateTime.now());
+        return new GeneratedContractResponse(documentService.generate(dto, DocumentType.valueOf(dto.documentType())), DocumentFormat.DOCX.name(),dto.clientInfoDto().fullName(), LocalDateTime.now());
     }
 }

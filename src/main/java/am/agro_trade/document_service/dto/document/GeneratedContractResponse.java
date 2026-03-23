@@ -7,6 +7,7 @@ public record GeneratedContractResponse(
 
         String encodeDocument,
         String format,
+        String name,
         LocalDateTime createdAt
 ) {
 }
