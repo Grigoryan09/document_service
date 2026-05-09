@@ -9,11 +9,18 @@ import java.math.BigDecimal;
 public record OfferDto(
 
         @Valid
+        BankDto bank,
+
+        @Valid
         @NotBlank(message = "Offer type must be provided")
         String offerType,
 
         @Valid
         @NotNull(message = "Interest rate must be provided")
-        BigDecimal interestRate
+        BigDecimal interestRate,
+
+        int maxDurationMonths,
+
+        BigDecimal minAmount
 ) {
 }
