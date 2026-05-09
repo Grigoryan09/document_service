@@ -1,7 +1,7 @@
 package am.agro_trade.document_service.service.impl;
 
 import am.agro_trade.document_service.dto.PaymentRowDto;
-import am.agro_trade.document_service.dto.document.DocumentGenerateDto;
+import am.agro_trade.document_service.dto.document.ContractDocumentGenerateRequest;
 import am.agro_trade.document_service.enums.DocumentType;
 import am.agro_trade.document_service.exception.DocumentProcessingException;
 import am.agro_trade.document_service.exception.TemplateLoadException;
@@ -44,7 +44,7 @@ public class ContractDocumentGenerator implements DocumentGenerator {
     }
 
     @Override
-    public String generate(DocumentGenerateDto dto) {
+    public String generate(ContractDocumentGenerateRequest dto) {
 
         InputStream is = loadTemplate();
 
@@ -73,7 +73,7 @@ public class ContractDocumentGenerator implements DocumentGenerator {
         }
     }
 
-    private void replaceVariables(MainDocumentPart mainPart, DocumentGenerateDto dto) {
+    private void replaceVariables(MainDocumentPart mainPart, ContractDocumentGenerateRequest dto) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         var bank = dto.bankDto();
         var offer = dto.offerDto();
