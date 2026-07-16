@@ -25,15 +25,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class ContractDocumentGenerator implements DocumentGenerator {
+public class ContractDocumentGenerator implements DocumentGenerator<ContractDocumentGenerateRequest> {
 
     private final ResourceLoader resourceLoader;
     private final TemplateProperties templateProperties;
@@ -133,7 +135,8 @@ public class ContractDocumentGenerator implements DocumentGenerator {
 
     private String decimalFormat(BigDecimal value) {
         if (value == null) return "";
-        return new DecimalFormat("#.##").format(value);
+        // Fixed locale so generated documents are identical regardless of the server's default locale.
+        return new DecimalFormat("#.##", DecimalFormatSymbols.getInstance(Locale.ROOT)).format(value);
     }
 
     private byte[] toByteArray(WordprocessingMLPackage word) {
