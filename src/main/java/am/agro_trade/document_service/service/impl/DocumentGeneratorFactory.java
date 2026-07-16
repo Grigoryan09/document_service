@@ -13,15 +13,15 @@ import java.util.stream.Collectors;
 @Service
 public class DocumentGeneratorFactory {
 
-    private final Map<DocumentType, DocumentGenerator> generators;
+    private final Map<DocumentType, DocumentGenerator<?>> generators;
 
-    public DocumentGeneratorFactory(List<DocumentGenerator> generatorList) {
+    public DocumentGeneratorFactory(List<DocumentGenerator<?>> generatorList) {
         this.generators = generatorList.stream()
                 .collect(Collectors.toMap(DocumentGenerator::getType, Function.identity()));
     }
 
-    public DocumentGenerator getGenerator(DocumentType type) {
-        DocumentGenerator generator = generators.get(type);
+    public DocumentGenerator<?> getGenerator(DocumentType type) {
+        DocumentGenerator<?> generator = generators.get(type);
 
         if (generator == null) {
             throw new DocumentGeneratorNotFoundException(type);

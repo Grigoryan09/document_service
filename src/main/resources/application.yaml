@@ -1,7 +1,25 @@
 spring:
   application:
     name: document_service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: document-service
+      auto-offset-reset: earliest
 
 template:
   path:
     contract: classpath:/templates/contract.docx
+    order: classpath:/templates/order.docx
+
+document:
+  kafka:
+    contract-topic: contract-document-generate-events
+    contract-result-topic: contract-document-result-events
+    order-generate-topic: order-document-generate-events
+    order-result-topic: order-document-result-events
+  output:
+    path: ${DOCUMENT_OUTPUT_PATH:./generated-documents}
+
+server:
+  port: 8085

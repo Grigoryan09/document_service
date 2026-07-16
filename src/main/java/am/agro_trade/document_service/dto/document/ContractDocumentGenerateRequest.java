@@ -8,6 +8,10 @@ import java.util.List;
 
 public record ContractDocumentGenerateRequest(
 
+        long externalRequestId,
+
+        long finalContractId,
+
         @Valid
         @NotNull
         BankDto bankDto,
