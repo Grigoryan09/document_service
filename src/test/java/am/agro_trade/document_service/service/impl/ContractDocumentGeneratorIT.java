@@ -32,6 +32,7 @@ class ContractDocumentGeneratorIT {
     private static ContractDocumentGenerateRequest sampleRequest(List<PaymentRowDto> rows) {
         ProductDto product = new ProductDto("Tractor", "MACHINERY");
         return new ContractDocumentGenerateRequest(
+                1L, 1L,
                 new BankDto("Agro Bank", "+37411223344", "LIC-987"),
                 new OfferDto(null, "STANDARD", new BigDecimal("12.5"), 24, new BigDecimal("1000")),
                 new FinalContractDto(
