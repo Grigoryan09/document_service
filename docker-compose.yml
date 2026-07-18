@@ -1,26 +1,4 @@
 services:
-  kafka:
-    image: confluentinc/cp-kafka:7.6.0
-    container_name: document-service-kafka
-    ports:
-      - "9092:9092"
-    environment:
-      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    healthcheck:
-      test: [ "CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   document-service:
     build:
       context: .
@@ -28,14 +6,19 @@ services:
     container_name: document-service
     ports:
       - "8085:8085"
-    depends_on:
-      kafka:
-        condition: service_healthy
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       DOCUMENT_OUTPUT_PATH: /app/generated-documents
     volumes:
       - generated_documents:/app/generated-documents
+    networks:
+      - kafka
+
+networks:
+  # External network created by the agro_trade compose project (shared Kafka).
+  kafka:
+    external: true
+    name: agro_trade_default
 
 volumes:
   generated_documents:
